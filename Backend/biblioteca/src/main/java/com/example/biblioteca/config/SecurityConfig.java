@@ -57,7 +57,8 @@ public class SecurityConfig {
             .cors(cors -> cors.disable()) // Puedes configurarlo después para conectar tu frontend
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll() // Rutas de login/registro públicas
-                .requestMatchers("/api/books").permitAll()   // Ver libros es público
+                .requestMatchers("/api/libros").permitAll()
+                .requestMatchers("/error").permitAll()   // Ver libros es público
                 .anyRequest().authenticated()                // Todo lo demás requiere token
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
