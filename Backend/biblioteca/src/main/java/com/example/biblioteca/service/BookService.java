@@ -20,8 +20,8 @@ public class BookService {
     }
 
     public List<Book> getAvailableBooks() {
-        return bookRepository.findByIsAvailableTrue();
-    }
+    return bookRepository.findByDisponibleTrue();
+}
 
     public Book saveBook(Book book) {
         return bookRepository.save(book);
