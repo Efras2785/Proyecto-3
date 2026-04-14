@@ -54,7 +54,13 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable()) // Desactivamos CSRF porque usamos JWT
-            .cors(cors -> cors.configurationSource(request -> new org.springframework.web.cors.CorsConfiguration().applyPermitDefaultValues()))
+            .cors(cors -> cors.configurationSource(request -> {
+            org.springframework.web.cors.CorsConfiguration configuration = new org.springframework.web.cors.CorsConfiguration();
+            configuration.setAllowedOrigins(java.util.List.of("*"));
+            configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+            configuration.setAllowedHeaders(java.util.List.of("*"));
+            return configuration;
+        }))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll() // Rutas de login/registro públicas
                 .requestMatchers("/api/users/register").permitAll()

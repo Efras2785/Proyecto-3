@@ -56,4 +56,37 @@ public class PrestamosService {
     public List<Prestamos> getAllHistory() {
         return prestamosRepository.findAll();
     }
+
+    // 1. Obtener mis préstamos de forma segura (usando el username)
+    public List<Prestamos> getMyHistory(String username) {
+        usuarios user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        return prestamosRepository.findByUserId(user.getId());
+    }
+
+    // 2. Lógica para devolver un libro
+    @Transactional
+    public Prestamos returnBook(Long prestamoId, String username) {
+        Prestamos prestamo = prestamosRepository.findById(prestamoId)
+                .orElseThrow(() -> new RuntimeException("Préstamo no encontrado"));
+
+        // Verificamos que el usuario que intenta devolverlo sea el dueño del préstamo
+        if (!prestamo.getUser().getUsername().equals(username)) {
+            throw new RuntimeException("No tienes permiso para devolver este libro");
+        }
+
+        if ("DEVUELTO".equals(prestamo.getStatus())) {
+            throw new RuntimeException("Este libro ya fue devuelto");
+        }
+
+        // 1. Marcamos el préstamo como DEVUELTO
+        prestamo.setStatus("DEVUELTO");
+
+        // 2. Volvemos a poner el libro como disponible en el catálogo
+        Book book = prestamo.getBook();
+        book.setDisponible(true);
+        bookRepository.save(book);
+
+        return prestamosRepository.save(prestamo);
+    }
 }
