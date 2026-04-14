@@ -103,29 +103,31 @@
     const API_URL = 'http://localhost:8080/api';
     const token = localStorage.getItem('token');
 
-    // Protección de ruta
+    // Si no hay token, al login
     if (!token) window.location.href = 'index.html';
 
+    // ==========================================
+    // 1. CARGAR EL CATÁLOGO COMPLETO
+    // ==========================================
     async function cargarDisponibles() {
         try {
-            // Hacemos la petición para traer TODOS los libros
+            // Hacemos GET a la ruta general que trae TODOS los libros
             const res = await fetch(`${API_URL}/libros`);
             const todosLosLibros = await res.json();
             let html = '';
             
             if (todosLosLibros.length === 0) {
-                html = '<p style="grid-column: 1 / -1; text-align: center; color: #7f8c8d;">No hay libros registrados en la biblioteca.</p>';
+                html = '<p style="grid-column: 1 / -1; text-align: center; color: #7f8c8d;">No hay libros en la biblioteca.</p>';
             } else {
+                // Recorremos TODOS los libros, sin importar si están prestados o no
                 todosLosLibros.forEach(l => {
-                    // Verificamos el estado del libro
                     const estaDisponible = l.disponible === true;
 
-                    // Si está disponible, botón verde. Si no, botón rojo y bloqueado.
+                    // El botón cambia de color y función dependiendo del estado
                     const botonHtml = estaDisponible 
                         ? `<button class="btn-borrow" onclick="abrirModal(${l.id}, '${l.titulo}')">Pedir Prestado</button>`
                         : `<button class="btn-borrow" style="background-color: #c0392b; cursor: not-allowed;" disabled>🔴 Prestado</button>`;
 
-                    // Efecto visual: bajamos la opacidad de la tarjeta para que se vea "desactivada"
                     const opacidad = estaDisponible ? '1' : '0.65';
 
                     html += `
@@ -148,54 +150,9 @@
         }
     }
 
-    // Funciones para el Modal
-    function abrirModal(idLibro, tituloLibro) {
-        document.getElementById('prestamoLibroId').value = idLibro;
-        document.getElementById('prestamoLibroTitulo').value = tituloLibro;
-        document.getElementById('modalPrestamo').style.display = 'flex';
-    }
-
-    function cerrarModal() {
-        document.getElementById('modalPrestamo').style.display = 'none';
-    }
-
-    async function actualizarPrestado() {
-        const idLibro = document.getElementById('prestamoLibroId').value;
-
-        try {
-            // Cambiamos a la ruta exacta de TU controlador: /api/prestamos/borrow
-            const response = await fetch(`${API_URL}/prestamos/borrow`, {
-                method: 'POST',
-                headers: { 
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    libroId: parseInt(idLibro)
-                })
-            });
-
-            if (response.ok) {
-                alert("¡Préstamo realizado con éxito! El libro ya es tuyo.");
-                cerrarModal();
-                cargarDisponibles(); // Esto recarga el catálogo y el libro desaparecerá
-            } else {
-                const error = await response.json();
-                alert("Error al procesar el préstamo. Verifica la consola.");
-            }
-        } catch (err) {
-            alert("Error de conexión con el servidor.");
-        }
-    }
-
-    function cerrarSesion() {
-        localStorage.removeItem('token');
-        window.location.href = 'index.html';
-    }
-
-    cargarDisponibles();
-    cargarMisPrestamos();
-    // Función para cargar la tabla superior
+    // ==========================================
+    // 2. CARGAR MIS PRÉSTAMOS (TABLA SUPERIOR)
+    // ==========================================
     async function cargarMisPrestamos() {
         try {
             const res = await fetch(`${API_URL}/prestamos/mis-prestamos`, {
@@ -208,10 +165,8 @@
                 html = '<tr><td colspan="4" style="text-align:center; padding: 20px; color: #7f8c8d;">Aún no has pedido ningún libro prestado.</td></tr>';
             } else {
                 prestamos.forEach(p => {
-                    // Formateamos las fechas para que se vean bonitas
                     const fechaPrestamo = new Date(p.loanDate).toLocaleDateString();
                     
-                    // Calculamos la fecha de entrega (14 días después)
                     const fechaDev = new Date(p.loanDate);
                     fechaDev.setDate(fechaDev.getDate() + 14);
                     const fechaDevolucion = fechaDev.toLocaleDateString();
@@ -221,7 +176,6 @@
                         ? '<span style="color: #e67e22; font-weight: bold;">🟠 ACTIVO</span>' 
                         : '<span style="color: #27ae60; font-weight: bold;">🟢 DEVUELTO</span>';
                     
-                    // Solo mostramos el botón de Devolver si está ACTIVO
                     const botonHtml = isActivo 
                         ? `<button class="btn-borrow" style="background-color: #3498db; padding: 8px; margin-top: 5px;" onclick="devolverLibro(${p.id})">Devolver Libro</button>` 
                         : '';
@@ -241,7 +195,36 @@
         }
     }
 
-    // Función para devolver el libro
+    // ==========================================
+    // 3. FUNCIONES DE ACCIÓN (PEDIR Y DEVOLVER)
+    // ==========================================
+    async function actualizarPrestado() {
+        const idLibro = document.getElementById('prestamoLibroId').value;
+
+        try {
+            const response = await fetch(`${API_URL}/prestamos/borrow`, {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ libroId: parseInt(idLibro) })
+            });
+
+            if (response.ok) {
+                alert("¡Préstamo realizado con éxito!");
+                cerrarModal();
+                // RECARGAMOS AMBAS COSAS
+                cargarDisponibles(); 
+                cargarMisPrestamos(); 
+            } else {
+                alert("Error al procesar el préstamo.");
+            }
+        } catch (err) {
+            alert("Error de conexión con el servidor.");
+        }
+    }
+
     async function devolverLibro(prestamoId) {
         if(confirm("¿Confirmas que deseas devolver este libro?")) {
             try {
@@ -251,9 +234,10 @@
                 });
 
                 if (response.ok) {
-                    alert("¡Libro devuelto a la biblioteca con éxito!");
-                    cargarMisPrestamos(); // Recargamos la tabla superior
-                    cargarDisponibles(); // Recargamos el catálogo para que vuelva a aparecer la tarjeta
+                    alert("¡Libro devuelto con éxito!");
+                    // RECARGAMOS AMBAS COSAS
+                    cargarMisPrestamos(); 
+                    cargarDisponibles(); 
                 } else {
                     alert("Error al devolver el libro.");
                 }
@@ -262,6 +246,28 @@
             }
         }
     }
+
+    // ==========================================
+    // 4. FUNCIONES DEL MODAL Y SESIÓN
+    // ==========================================
+    function abrirModal(idLibro, tituloLibro) {
+        document.getElementById('prestamoLibroId').value = idLibro;
+        document.getElementById('prestamoLibroTitulo').value = tituloLibro;
+        document.getElementById('modalPrestamo').style.display = 'flex';
+    }
+
+    function cerrarModal() {
+        document.getElementById('modalPrestamo').style.display = 'none';
+    }
+
+    function cerrarSesion() {
+        localStorage.removeItem('token');
+        window.location.href = 'index.html';
+    }
+
+    // ARRANQUE DE LA PÁGINA
+    cargarDisponibles();
+    cargarMisPrestamos();
 </script>
 </body>
 </html>

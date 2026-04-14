@@ -87,9 +87,32 @@
     </div>
 </div>
 
+<div id="modalEditarLibro" class="modal-overlay">
+    <div class="modal-content">
+        <h3>Modificar Libro</h3>
+        <input type="hidden" id="editLibroId"> <label style="font-size: 14px; color: #555;">Título:</label>
+        <input type="text" id="editTituloLibro">
+        
+        <label style="font-size: 14px; color: #555;">Autor:</label>
+        <input type="text" id="editAutorLibro">
+        
+        <label style="font-size: 14px; color: #555;">Género:</label>
+        <input type="text" id="editGeneroLibro">
+        
+        <label style="font-size: 14px; color: #555;">Descripción:</label>
+        <textarea id="editDescLibro" rows="4"></textarea>
+
+        <div class="modal-actions">
+            <button class="btn btn-cancel" onclick="cerrarModal('modalEditarLibro')">Cancelar</button>
+            <button class="btn btn-edit" onclick="actualizarLibro()">Guardar Cambios</button>
+        </div>
+    </div>
+</div>
+
 <script>
     const API_URL = 'http://localhost:8080/api';
     const token = localStorage.getItem('token');
+    let librosGlobales = [];
 
     // Si no hay token, lo mandamos al login
     if (!token) window.location.href = 'index.html'; 
@@ -98,15 +121,16 @@
 
     async function cargarLibros() {
         const res = await fetch(`${API_URL}/libros`);
-        const libros = await res.json();
+        librosGlobales = await res.json(); // Guardamos los libros en la memoria
+        
         let html = '';
-        libros.forEach(l => {
+        librosGlobales.forEach(l => {
             html += `<tr>
                 <td><img src="${l.portada || 'https://via.placeholder.com/50'}" class="portada"></td>
                 <td>${l.titulo}</td>
                 <td>${l.autor}</td>
                 <td>${l.disponible ? '🟢 Disponible' : '🔴 Prestado'}</td>
-                <td><button class="btn btn-edit" onclick="alert('Funcionalidad de editar libro en construcción')">Modificar</button></td>
+                <td><button class="btn btn-edit" onclick="abrirModalEditarLibro(${l.id})">Modificar</button></td>
             </tr>`;
         });
         document.querySelector('#tabla-libros tbody').innerHTML = html;
@@ -213,6 +237,60 @@
     function cerrarSesion() {
         localStorage.removeItem('token');
         window.location.href = 'index.html';
+    }
+
+    // Abre el modal y rellena los datos
+    function abrirModalEditarLibro(id) {
+        // Buscamos el libro exacto en nuestra memoria
+        const libro = librosGlobales.find(l => l.id === id);
+        
+        if (libro) {
+            document.getElementById('editLibroId').value = libro.id;
+            document.getElementById('editTituloLibro').value = libro.titulo || '';
+            document.getElementById('editAutorLibro').value = libro.autor || '';
+            document.getElementById('editGeneroLibro').value = libro.genero || '';
+            document.getElementById('editDescLibro').value = libro.descripcion || '';
+            
+            document.getElementById('modalEditarLibro').style.display = 'flex';
+        }
+    }
+
+    // Envía los cambios al Backend
+    async function actualizarLibro() {
+        const id = document.getElementById('editLibroId').value;
+        
+        // Recuperamos el libro original para no borrarle su portada ni cambiar su disponibilidad accidentalmente
+        const libroOriginal = librosGlobales.find(l => l.id == id);
+        
+        const bookData = {
+            titulo: document.getElementById('editTituloLibro').value,
+            autor: document.getElementById('editAutorLibro').value,
+            genero: document.getElementById('editGeneroLibro').value,
+            descripcion: document.getElementById('editDescLibro').value,
+            disponible: libroOriginal.disponible, 
+            portada: libroOriginal.portada 
+        };
+
+        try {
+            const response = await fetch(`${API_URL}/libros/${id}`, {
+                method: 'PUT',
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(bookData)
+            });
+
+            if (response.ok) {
+                alert("¡Libro actualizado correctamente!");
+                cerrarModal('modalEditarLibro');
+                cargarLibros(); // Recarga la tabla para ver los cambios
+            } else {
+                alert("Error al actualizar el libro en el servidor.");
+            }
+        } catch (err) {
+            alert("Error de conexión.");
+        }
     }
 
     // Al cargar la página, llenamos las tablas
