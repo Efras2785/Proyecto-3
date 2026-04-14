@@ -33,4 +33,14 @@ public class UserService {
         // userRepository ya tiene el método findAll() por defecto gracias a Spring Data JPA
         return userRepository.findAll();
     }
+    public usuarios updateUser(Long id, usuarios userDetails) {
+        usuarios usuarioExistente = userRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        
+        // Actualizamos solo el nombre y el rol (la contraseña no la tocamos aquí por seguridad)
+        usuarioExistente.setUsername(userDetails.getUsername());
+        usuarioExistente.setRole(userDetails.getRole());
+        
+        return userRepository.save(usuarioExistente);
+    }
 }

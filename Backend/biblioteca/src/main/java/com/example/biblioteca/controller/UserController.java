@@ -21,7 +21,6 @@ public class UserController {
     private UserService userService;
 
     // El ADMIN puede crear nuevos usuarios
-    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/register")
     public usuarios register(@RequestBody usuarios user) {
         return userService.registerUser(user);
@@ -31,6 +30,12 @@ public class UserController {
     @GetMapping
     public List<usuarios> getAllUsers() {
         return userService.getAllUsers();
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.web.bind.annotation.PutMapping("/{id}")
+    public usuarios updateUser(@org.springframework.web.bind.annotation.PathVariable Long id, @RequestBody usuarios userDetails) {
+        return userService.updateUser(id, userDetails);
     }
 
     

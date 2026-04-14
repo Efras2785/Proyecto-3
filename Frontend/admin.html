@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel de Administración</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9f9f9; margin: 0; }
+        header { background-color: #2c3e50; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .container { padding: 2rem; max-width: 1200px; margin: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #8e44ad; color: white; }
+        .btn { padding: 8px 12px; border: none; border-radius: 3px; cursor: pointer; color: white; font-weight: bold;}
+        .btn-add { background-color: #27ae60; margin-bottom: 10px;}
+        .btn-edit { background-color: #f39c12; }
+        .btn-logout { background-color: #e74c3c; padding: 10px; }
+        img.portada { width: 50px; height: 75px; object-fit: cover; border-radius: 3px; }
+        
+        /* Estilos para las ventanas modales */
+        .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; justify-content: center; align-items: center; }
+        .modal-content { background:white; width:400px; padding:20px; border-radius:8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .modal-content input, .modal-content select, .modal-content textarea { width: 100%; margin-bottom: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .modal-actions { display: flex; justify-content: space-between; }
+        .btn-cancel { background: #95a5a6; color: white; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h2>🏛️ Biblioteca | Panel Admin</h2>
+    <button class="btn btn-logout" onclick="cerrarSesion()">Cerrar Sesión</button>
+</header>
+
+<div class="container">
+    <h3>Gestión de Libros</h3>
+    <button class="btn btn-add" onclick="abrirModalLibro()">+ Añadir Nuevo Libro</button>
+    <table id="tabla-libros">
+        <thead>
+            <tr>
+                <th>Portada</th><th>Título</th><th>Autor</th><th>Estado</th><th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <h3 style="margin-top: 40px;">Gestión de Lectores / Usuarios</h3>
+    <table id="tabla-usuarios">
+        <thead>
+            <tr>
+                <th>ID</th><th>Usuario</th><th>Rol</th><th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div id="modalLibro" class="modal-overlay">
+    <div class="modal-content">
+        <h3>Añadir Nuevo Libro</h3>
+        <input type="text" id="tituloLibro" placeholder="Título del libro">
+        <input type="text" id="autorLibro" placeholder="Autor">
+        <input type="text" id="generoLibro" placeholder="Género">
+        <textarea id="descLibro" placeholder="Descripción" rows="3"></textarea>
+        <label style="font-size: 14px; color: #555;">Portada (Imagen):</label>
+        <input type="file" id="fileLibro" accept="image/*">
+        <div class="modal-actions">
+            <button class="btn btn-cancel" onclick="cerrarModal('modalLibro')">Cancelar</button>
+            <button class="btn btn-add" onclick="guardarLibro()">Guardar Libro</button>
+        </div>
+    </div>
+</div>
+
+<div id="modalUsuario" class="modal-overlay">
+    <div class="modal-content">
+        <h3>Modificar Usuario</h3>
+        <input type="hidden" id="editUserId"> <label style="font-size: 14px; color: #555;">Nombre de Usuario:</label>
+        <input type="text" id="editUsername" placeholder="Usuario">
+        <label style="font-size: 14px; color: #555;">Rol en el sistema:</label>
+        <select id="editRole">
+            <option value="ROLE_USER">Lector Normal (ROLE_USER)</option>
+            <option value="ROLE_ADMIN">Administrador (ROLE_ADMIN)</option>
+        </select>
+        <div class="modal-actions">
+            <button class="btn btn-cancel" onclick="cerrarModal('modalUsuario')">Cancelar</button>
+            <button class="btn btn-edit" onclick="actualizarUsuario()">Actualizar Usuario</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_URL = 'http://localhost:8080/api';
+    const token = localStorage.getItem('token');
+
+    // Si no hay token, lo mandamos al login
+    if (!token) window.location.href = 'index.html'; 
+
+    // --- FUNCIONES DE CARGA DE TABLAS ---
+
+    async function cargarLibros() {
+        const res = await fetch(`${API_URL}/libros`);
+        const libros = await res.json();
+        let html = '';
+        libros.forEach(l => {
+            html += `<tr>
+                <td><img src="${l.portada || 'https://via.placeholder.com/50'}" class="portada"></td>
+                <td>${l.titulo}</td>
+                <td>${l.autor}</td>
+                <td>${l.disponible ? '🟢 Disponible' : '🔴 Prestado'}</td>
+                <td><button class="btn btn-edit" onclick="alert('Funcionalidad de editar libro en construcción')">Modificar</button></td>
+            </tr>`;
+        });
+        document.querySelector('#tabla-libros tbody').innerHTML = html;
+    }
+
+    async function cargarUsuarios() {
+        const res = await fetch(`${API_URL}/users`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const usuarios = await res.json();
+        let html = '';
+        usuarios.forEach(u => {
+            html += `<tr>
+                <td>${u.id}</td>
+                <td>${u.username}</td>
+                <td>${u.role === 'ROLE_ADMIN' ? 'Admin' : 'Lector'}</td>
+                <td><button class="btn btn-edit" onclick="abrirModalUsuario(${u.id}, '${u.username}', '${u.role}')">Modificar</button></td>
+            </tr>`;
+        });
+        document.querySelector('#tabla-usuarios tbody').innerHTML = html;
+    }
+
+    // --- FUNCIONES DE MODALES ---
+
+    function cerrarModal(idModal) {
+        document.getElementById(idModal).style.display = 'none';
+    }
+
+    function abrirModalLibro() {
+        document.getElementById('modalLibro').style.display = 'flex';
+    }
+
+    function abrirModalUsuario(id, username, role) {
+        document.getElementById('editUserId').value = id;
+        document.getElementById('editUsername').value = username;
+        document.getElementById('editRole').value = role;
+        document.getElementById('modalUsuario').style.display = 'flex';
+    }
+
+    // --- LÓGICA DE GUARDADO Y ACTUALIZACIÓN ---
+
+    async function guardarLibro() {
+        const fileInput = document.getElementById('fileLibro');
+        if (!fileInput.files[0]) {
+            alert("Selecciona una imagen de portada.");
+            return;
+        }
+
+        const bookData = {
+            titulo: document.getElementById('tituloLibro').value,
+            autor: document.getElementById('autorLibro').value,
+            genero: document.getElementById('generoLibro').value,
+            descripcion: document.getElementById('descLibro').value,
+            disponible: true
+        };
+
+        const formData = new FormData();
+        formData.append('book', new Blob([JSON.stringify(bookData)], { type: 'application/json' }));
+        formData.append('file', fileInput.files[0]);
+
+        const response = await fetch(`${API_URL}/libros`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+        });
+
+        if (response.ok) {
+            alert("¡Libro guardado!");
+            cerrarModal('modalLibro');
+            cargarLibros(); // Recarga la tabla
+        } else {
+            alert("Error al guardar el libro");
+        }
+    }
+
+    async function actualizarUsuario() {
+        const id = document.getElementById('editUserId').value;
+        const nuevoUsername = document.getElementById('editUsername').value;
+        const nuevoRol = document.getElementById('editRole').value;
+
+        const userData = {
+            username: nuevoUsername,
+            role: nuevoRol
+        };
+
+        const response = await fetch(`${API_URL}/users/${id}`, {
+            method: 'PUT',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(userData)
+        });
+
+        if (response.ok) {
+            alert("¡Usuario actualizado correctamente!");
+            cerrarModal('modalUsuario');
+            cargarUsuarios(); // Recarga la tabla de usuarios
+        } else {
+            alert("Error al actualizar el usuario");
+        }
+    }
+
+    function cerrarSesion() {
+        localStorage.removeItem('token');
+        window.location.href = 'index.html';
+    }
+
+    // Al cargar la página, llenamos las tablas
+    cargarLibros();
+    cargarUsuarios();
+</script>
+</body>
+</html>

@@ -3,9 +3,8 @@ package com.example.biblioteca.controller;
 import java.io.IOException;
 import java.util.List;
 
-// --- IMPORTACIONES CORREGIDAS ---
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType; // <- La librería correcta para Spring
+import org.springframework.http.MediaType; 
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,7 +18,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.example.biblioteca.model.Book;
 import com.example.biblioteca.service.BookService;
-import com.fasterxml.jackson.databind.ObjectMapper; // <- La librería correcta para Jackson
+import com.example.biblioteca.service.SupabaseStorageService; // <- Importamos nuestro mensajero
+import com.fasterxml.jackson.databind.ObjectMapper; 
 
 @RestController
 @RequestMapping("/api/libros")
@@ -27,6 +27,9 @@ public class BookController {
 
     @Autowired
     private BookService bookService;
+
+    @Autowired
+    private SupabaseStorageService storageService; // <- Inyectamos el servicio de Supabase
 
     // Públicos o para usuarios logueados
     @GetMapping
@@ -54,10 +57,18 @@ public class BookController {
             @RequestPart("file") MultipartFile file // El archivo de la imagen
     ) throws IOException {
         
-        // Convertir el String bookJson a objeto Book
+        // 1. Convertir el String bookJson a objeto Book usando tu solución
         ObjectMapper objectMapper = new ObjectMapper();
         Book book = objectMapper.readValue(bookJson, Book.class);
         
-        return bookService.saveBookWithImage(book, file);
+        // 2. Subir la imagen a Supabase Storage y obtener el link público
+        String imageUrl = storageService.uploadImage(file);
+        
+        // 3. Asignar el link de la imagen a nuestro libro
+        book.setPortada(imageUrl);
+        
+        // 4. Guardar todo (datos + link de la imagen) en la base de datos PostgreSQL
+        // Nota: Asegúrate de que tu BookService tenga el método saveBook(book) normal
+        return bookService.saveBook(book); 
     }
 }
