@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Biblioteca Digital | Ingreso</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f1ea; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 350px; border-top: 5px solid #8e44ad; }
+        h2 { text-align: center; color: #2c3e50; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background-color: #8e44ad; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        button:hover { background-color: #732d91; }
+        button:disabled { background-color: #95a5a6; cursor: not-allowed; }
+        .toggle-link { text-align: center; margin-top: 15px; color: #3498db; cursor: pointer; font-size: 14px; }
+        #mensaje { color: #e74c3c; text-align: center; font-size: 14px; margin-top: 10px; font-weight: bold; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2 id="titulo">Iniciar Sesión</h2>
+    
+    <div id="login-form">
+        <input type="text" id="log-user" placeholder="Usuario">
+        <input type="password" id="log-pass" placeholder="Contraseña">
+        <button id="btn-login" onclick="iniciarSesion()">Entrar a la Biblioteca</button>
+        <div class="toggle-link" onclick="toggleForm()">¿No tienes cuenta? Regístrate aquí</div>
+    </div>
+
+    <div id="register-form" class="hidden">
+        <input type="text" id="reg-user" placeholder="Nuevo Usuario">
+        <input type="password" id="reg-pass" placeholder="Nueva Contraseña">
+        <button onclick="registrar()">Registrarse</button>
+        <div class="toggle-link" onclick="toggleForm()">Ya tengo cuenta. Iniciar sesión</div>
+    </div>
+
+    <p id="mensaje"></p>
+</div>
+
+<script>
+    const API_URL = 'http://localhost:8080/api';
+    let intentosFallidos = parseInt(localStorage.getItem('intentos')) || 0;
+
+    // Revisar si está bloqueado al cargar la página
+    verificarBloqueo();
+
+    function toggleForm() {
+        document.getElementById('login-form').classList.toggle('hidden');
+        document.getElementById('register-form').classList.toggle('hidden');
+        document.getElementById('titulo').innerText = document.getElementById('login-form').classList.contains('hidden') ? 'Nuevo Lector' : 'Iniciar Sesión';
+        document.getElementById('mensaje').innerText = '';
+    }
+
+    function verificarBloqueo() {
+        const tiempoDesbloqueo = localStorage.getItem('desbloqueo');
+        if (tiempoDesbloqueo && Date.now() < tiempoDesbloqueo) {
+            const tiempoRestante = Math.ceil((tiempoDesbloqueo - Date.now()) / 1000);
+            document.getElementById('btn-login').disabled = true;
+            document.getElementById('mensaje').innerText = `Cuenta bloqueada. Intenta en ${tiempoRestante} segundos.`;
+            setTimeout(verificarBloqueo, 1000);
+        } else {
+            localStorage.removeItem('desbloqueo');
+            localStorage.setItem('intentos', 0);
+            intentosFallidos = 0;
+            document.getElementById('btn-login').disabled = false;
+            document.getElementById('mensaje').innerText = '';
+        }
+    }
+
+    async function iniciarSesion() {
+        if (document.getElementById('btn-login').disabled) return;
+
+        const user = document.getElementById('log-user').value;
+        const pass = document.getElementById('log-pass').value;
+
+        try {
+            const response = await fetch(`${API_URL}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: user, password: pass })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                localStorage.setItem('token', data.accessToken);
+                localStorage.setItem('intentos', 0); // Resetea intentos
+                
+                // Leer el JWT para saber el rol
+                const payload = JSON.parse(atob(data.accessToken.split('.')[1]));
+
+                // payload.sub guarda el nombre del usuario ("admin", "efren", etc.)
+                if(payload.sub === 'admin') {
+                    window.location.href = 'admin.html';
+                } else {
+                    window.location.href = 'user.html';
+                }
+            } else {
+                intentosFallidos++;
+                localStorage.setItem('intentos', intentosFallidos);
+                
+                if (intentosFallidos >= 3) {
+                    const tiempoDesbloqueo = Date.now() + (60 * 1000); // 1 minuto
+                    localStorage.setItem('desbloqueo', tiempoDesbloqueo);
+                    verificarBloqueo();
+                } else {
+                    document.getElementById('mensaje').innerText = `Credenciales incorrectas. Intento ${intentosFallidos} de 3.`;
+                }
+            }
+        } catch (error) {
+            document.getElementById('mensaje').innerText = "Error al conectar con el servidor.";
+        }
+    }
+
+    async function registrar() {
+        const user = document.getElementById('reg-user').value;
+        const pass = document.getElementById('reg-pass').value;
+
+        const response = await fetch(`${API_URL}/users/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user, password: pass, role: 'ROLE_USER' }) // Forzamos rol USER
+        });
+
+        if (response.ok) {
+            alert('¡Lector registrado con éxito! Ahora inicia sesión.');
+            toggleForm();
+        } else {
+            document.getElementById('mensaje').innerText = "Error al registrar el usuario.";
+        }
+    }
+</script>
+</body>
+</html>

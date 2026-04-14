@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Mi Biblioteca | Lector</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f1ea; margin: 0; }
+        header { background-color: #16a085; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .container { padding: 2rem; max-width: 1100px; margin: auto; }
+        
+        /* Grid del catálogo */
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 25px; }
+        
+        /* Diseño de la tarjeta del libro */
+        .book-card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between;}
+        
+        /* DISEÑO DE IMAGEN CORREGIDO PARA MOSTRAR EL LIBRO COMPLETO */
+        .book-card img {
+            width: 100%;
+            height: 280px; 
+            object-fit: contain; /* ¡Línea mágica que evita el recorte! */
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .book-card h4 { margin: 0 0 5px 0; color: #2c3e50; font-size: 18px;}
+        .book-card .autor { color: #7f8c8d; font-size: 14px; font-weight: bold; margin: 0 0 10px 0; }
+        .book-card .badge { display: inline-block; background: #3498db; color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; margin-bottom: 10px; font-weight: bold;}
+        /* Nuevo diseño de descripción con barra de scroll oculta elegante */
+.book-card .desc { 
+    font-size: 13px; 
+    color: #555; 
+    height: 80px; /* Un poco más alto para que quepa bien el texto */
+    overflow-y: auto; /* Esto activa el scroll vertical */
+    margin-bottom: 15px;
+    padding-right: 5px; /* Espacio para que el texto no pegue con la barra */
+}
+
+/* Opcional: Le damos un diseño moderno y delgadito a la barra de scroll */
+.book-card .desc::-webkit-scrollbar {
+    width: 6px;
+}
+.book-card .desc::-webkit-scrollbar-thumb {
+    background-color: #bdc3c7;
+    border-radius: 10px;
+}
+        
+        /* Botones y tablas */
+        .btn-borrow { width: 100%; padding: 10px; background-color: #16a085; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 15px; font-weight: bold; transition: background 0.3s;}
+        .btn-borrow:hover { background-color: #12876f; }
+        .btn-logout { background-color: #c0392b; padding: 8px 15px; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;}
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: left; }
+        th { background-color: #bdc3c7; color: #2c3e50; }
+        
+        /* Estilos para el Modal de Préstamos */
+        #modalPrestamo { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; justify-content: center; align-items: center; }
+        .modal-content { background:white; width:400px; padding:20px; border-radius:8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .modal-content input { width: 100%; margin-bottom: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .modal-actions { display: flex; justify-content: space-between; }
+        .btn-cancel { background: #95a5a6; color: white; border: none; padding: 10px; cursor: pointer;}
+    </style>
+</head>
+<body>
+
+<header>
+    <h2>📚 Mi Biblioteca Digital</h2>
+    <button class="btn-logout" onclick="cerrarSesion()">Cerrar Sesión</button>
+</header>
+
+<div class="container">
+    <h3>Mis Préstamos Activos</h3>
+    <table id="tabla-mis-prestamos">
+        <thead>
+            <tr><th>Libro</th><th>Fecha de Préstamo</th><th>Devolución Esperada</th><th>Estado</th></tr>
+        </thead>
+        <tbody>
+            <tr><td colspan="4" style="text-align:center; padding: 20px; color: #7f8c8d;">Aún no has pedido ningún libro prestado.</td></tr>
+        </tbody>
+    </table>
+
+    <h3 style="margin-top: 50px;">Catálogo Disponible para Préstamo</h3>
+    <div class="grid" id="catalogo">
+        </div>
+</div>
+
+<div id="modalPrestamo">
+    <div class="modal-content">
+        <h3>Confirmar Préstamo</h3>
+        <input type="hidden" id="prestamoLibroId">
+        <label style="font-size: 14px; color: #555;">Confirmas que quieres pedir prestado el libro:</label>
+        <input type="text" id="prestamoLibroTitulo" readonly style="background-color: #eee;">
+        <label style="font-size: 14px; color: #555;">Días de préstamo:</label>
+        <input type="number" id="prestamoDias" value="14">
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="cerrarModal()">Cancelar</button>
+            <button class="btn-borrow" onclick="actualizarPrestado()">Confirmar Préstamo</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_URL = 'http://localhost:8080/api';
+    const token = localStorage.getItem('token');
+
+    // Protección de ruta
+    if (!token) window.location.href = 'index.html';
+
+    async function cargarDisponibles() {
+        try {
+            const res = await fetch(`${API_URL}/libros`);
+            const todosLosLibros = await res.json();
+            const librosDisponibles = todosLosLibros.filter(libro => libro.disponible === true);
+            let html = '';
+            
+            if (librosDisponibles.length === 0) {
+                html = '<p style="grid-column: 1 / -1; text-align: center; color: #7f8c8d;">No hay libros disponibles en este momento.</p>';
+            } else {
+                librosDisponibles.forEach(l => {
+                    html += `
+                    <div class="book-card">
+                        <div>
+                            <img src="${l.portada || 'https://via.placeholder.com/150x200?text=Sin+Portada'}" alt="Portada">
+                            <h4>${l.titulo}</h4>
+                            <p class="autor">${l.autor}</p>
+                            <span class="badge">${l.genero || 'General'}</span>
+                            <p class="desc">${l.descripcion || 'Sin descripción disponible.'}</p>
+                        </div>
+                        <button class="btn-borrow" onclick="abrirModal(${l.id}, '${l.titulo}')">Pedir Prestado</button>
+                    </div>`;
+                });
+            }
+            document.getElementById('catalogo').innerHTML = html;
+        } catch (error) {
+            console.error(error);
+            document.getElementById('catalogo').innerHTML = '<p style="color:red; grid-column: 1/-1;">Error de conexión con el servidor.</p>';
+        }
+    }
+
+    // Funciones para el Modal
+    function abrirModal(idLibro, tituloLibro) {
+        document.getElementById('prestamoLibroId').value = idLibro;
+        document.getElementById('prestamoLibroTitulo').value = tituloLibro;
+        document.getElementById('modalPrestamo').style.display = 'flex';
+    }
+
+    function cerrarModal() {
+        document.getElementById('modalPrestamo').style.display = 'none';
+    }
+
+    function actualizarPrestado() {
+        // Esta función está lista para cuando conectes tu tabla de Préstamos en Java
+        // Por ahora, simularemos el éxito
+        const idLibro = document.getElementById('prestamoLibroId').value;
+        const tituloLibro = document.getElementById('prestamoLibroTitulo').value;
+        const diasPrestamo = document.getElementById('prestamoDias').value;
+        
+        alert(`¡Petición enviada para pedir prestado "${tituloLibro}" (ID: ${idLibro}) por ${diasPrestamo} días`);
+        cerrarModal();
+        cargarDisponibles(); // Recargamos para simular que el libro ya no está disponible
+    }
+
+    function cerrarSesion() {
+        localStorage.removeItem('token');
+        window.location.href = 'index.html';
+    }
+
+    cargarDisponibles();
+</script>
+</body>
+</html>

@@ -54,9 +54,10 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable()) // Desactivamos CSRF porque usamos JWT
-            .cors(cors -> cors.disable()) // Puedes configurarlo después para conectar tu frontend
+            .cors(cors -> cors.configurationSource(request -> new org.springframework.web.cors.CorsConfiguration().applyPermitDefaultValues()))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll() // Rutas de login/registro públicas
+                .requestMatchers("/api/users/register").permitAll()
                 .requestMatchers("/api/libros").permitAll()
                 .requestMatchers("/error").permitAll()   // Ver libros es público
                 .anyRequest().authenticated()                // Todo lo demás requiere token
