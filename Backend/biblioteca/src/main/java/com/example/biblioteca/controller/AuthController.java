@@ -36,30 +36,9 @@ public class AuthController {
 
         // Si pasa la autenticación, generamos los tokens
         String accessToken = jwtUtil.generateToken(loginRequest.getUsername());
-        String refreshToken = jwtUtil.generateRefreshToken(loginRequest.getUsername());
 
         Map<String, String> tokens = new HashMap<>();
         tokens.put("accessToken", accessToken);
-        tokens.put("refreshToken", refreshToken);
         return tokens;
-    }
-
-    // Endpoint para usar el Refresh Token
-    @PostMapping("/refresh")
-    public Map<String, String> refreshToken(@RequestBody Map<String, String> request) {
-        String refreshToken = request.get("refreshToken");
-        String username = jwtUtil.extractUsername(refreshToken);
-
-        // Validamos que el refresh token sea válido
-        if (jwtUtil.isTokenValid(refreshToken, username)) {
-            String newAccessToken = jwtUtil.generateToken(username);
-            
-            Map<String, String> tokens = new HashMap<>();
-            tokens.put("accessToken", newAccessToken);
-            tokens.put("refreshToken", refreshToken); // Devolvemos el mismo o puedes generar uno nuevo
-            return tokens;
-        } else {
-            throw new RuntimeException("Refresh token inválido o expirado");
-        }
     }
 }

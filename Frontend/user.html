@@ -59,6 +59,20 @@
         .modal-content input { width: 100%; margin-bottom: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         .modal-actions { display: flex; justify-content: space-between; }
         .btn-cancel { background: #95a5a6; color: white; border: none; padding: 10px; cursor: pointer;}
+
+        .search-container { margin: 20px 0; text-align: right; }
+        .search-input { 
+            width: 100%; 
+            max-width: 400px; 
+            padding: 12px 20px; 
+            border: 2px solid #bdc3c7; 
+            border-radius: 25px; 
+            font-size: 16px; 
+            outline: none; 
+            transition: border-color 0.3s;
+        }
+        .search-input:focus { border-color: #16a085; }
+
     </style>
 </head>
 <body>
@@ -80,6 +94,13 @@
     </table>
 
     <h3 style="margin-top: 50px;">Catálogo Disponible para Préstamo</h3>
+    
+    <div class="search-container">
+        <input type="text" id="searchInput" class="search-input" placeholder="🔍 Buscar por título, autor o género..." onkeyup="filtrarLibros()">
+    </div>
+
+    <div class="grid" id="catalogo">
+        </div>
     <div class="grid" id="catalogo">
         </div>
 </div>
@@ -109,45 +130,63 @@
     // ==========================================
     // 1. CARGAR EL CATÁLOGO COMPLETO
     // ==========================================
+    let librosGlobales = [];
     async function cargarDisponibles() {
         try {
-            // Hacemos GET a la ruta general que trae TODOS los libros
             const res = await fetch(`${API_URL}/libros`);
-            const todosLosLibros = await res.json();
-            let html = '';
-            
-            if (todosLosLibros.length === 0) {
-                html = '<p style="grid-column: 1 / -1; text-align: center; color: #7f8c8d;">No hay libros en la biblioteca.</p>';
-            } else {
-                // Recorremos TODOS los libros, sin importar si están prestados o no
-                todosLosLibros.forEach(l => {
-                    const estaDisponible = l.disponible === true;
-
-                    // El botón cambia de color y función dependiendo del estado
-                    const botonHtml = estaDisponible 
-                        ? `<button class="btn-borrow" onclick="abrirModal(${l.id}, '${l.titulo}')">Pedir Prestado</button>`
-                        : `<button class="btn-borrow" style="background-color: #c0392b; cursor: not-allowed;" disabled>🔴 Prestado</button>`;
-
-                    const opacidad = estaDisponible ? '1' : '0.65';
-
-                    html += `
-                    <div class="book-card" style="opacity: ${opacidad};">
-                        <div>
-                            <img src="${l.portada || 'https://via.placeholder.com/150x200?text=Sin+Portada'}" alt="Portada">
-                            <h4>${l.titulo}</h4>
-                            <p class="autor">${l.autor}</p>
-                            <span class="badge">${l.genero || 'General'}</span>
-                            <p class="desc">${l.descripcion || 'Sin descripción disponible.'}</p>
-                        </div>
-                        ${botonHtml}
-                    </div>`;
-                });
-            }
-            document.getElementById('catalogo').innerHTML = html;
+            librosGlobales = await res.json(); // Guardamos todos los libros
+            renderizarCatalogo(librosGlobales); // Dibujamos los libros
         } catch (error) {
             console.error(error);
             document.getElementById('catalogo').innerHTML = '<p style="color:red; grid-column: 1/-1;">Error de conexión con el servidor.</p>';
         }
+    }
+
+    // Nueva función que se activa cada que el usuario escribe una letra
+    function filtrarLibros() {
+        const texto = document.getElementById('searchInput').value.toLowerCase();
+        
+        // Filtramos buscando coincidencias en título, autor o género
+        const librosFiltrados = librosGlobales.filter(l => {
+            const titulo = l.titulo ? l.titulo.toLowerCase() : '';
+            const autor = l.autor ? l.autor.toLowerCase() : '';
+            const genero = l.genero ? l.genero.toLowerCase() : '';
+            
+            return titulo.includes(texto) || autor.includes(texto) || genero.includes(texto);
+        });
+
+        renderizarCatalogo(librosFiltrados);
+    }
+
+    // Función que dibuja las tarjetas en la pantalla
+    function renderizarCatalogo(listaDeLibros) {
+        let html = '';
+        
+        if (listaDeLibros.length === 0) {
+            html = '<p style="grid-column: 1 / -1; text-align: center; color: #7f8c8d;">No se encontraron libros con esa búsqueda.</p>';
+        } else {
+            listaDeLibros.forEach(l => {
+                const estaDisponible = l.disponible === true;
+                const botonHtml = estaDisponible 
+                    ? `<button class="btn-borrow" onclick="abrirModal(${l.id}, '${l.titulo}')">Pedir Prestado</button>`
+                    : `<button class="btn-borrow" style="background-color: #c0392b; cursor: not-allowed;" disabled>🔴 Prestado</button>`;
+
+                const opacidad = estaDisponible ? '1' : '0.65';
+
+                html += `
+                <div class="book-card" style="opacity: ${opacidad};">
+                    <div>
+                        <img src="${l.portada || 'https://via.placeholder.com/150x200?text=Sin+Portada'}" alt="Portada">
+                        <h4>${l.titulo}</h4>
+                        <p class="autor">${l.autor}</p>
+                        <span class="badge">${l.genero || 'General'}</span>
+                        <p class="desc">${l.descripcion || 'Sin descripción disponible.'}</p>
+                    </div>
+                    ${botonHtml}
+                </div>`;
+            });
+        }
+        document.getElementById('catalogo').innerHTML = html;
     }
 
     // ==========================================

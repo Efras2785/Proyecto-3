@@ -14,30 +14,19 @@ import io.jsonwebtoken.security.Keys;
 @Component
 public class JwtUtil {
 
-    // En un entorno real, esta clave debe ir en tu application.properties
+   // En un entorno real, esta clave debe ir en tu application.properties
     // Debe ser una cadena larga y segura (al menos 256 bits)
     private static final String SECRET = "EstaEsUnaClaveSuperSecretaParaMiBibliotecaDigital2024!";
     private final Key key = Keys.hmacShaKeyFor(SECRET.getBytes());
 
-    // Tiempo de vida del Access Token (ej. 1 día)
-    private static final long ACCESS_TOKEN_EXPIRATION = 1000L * 60 * 60 * 24;
+    // Tiempo de vida del Access Token (10 horas exactas)
+    private static final long ACCESS_TOKEN_EXPIRATION = 1000L * 60 * 60 * 10;
     
-    // Tiempo de vida del Refresh Token (ej. 7 días)
-    private static final long REFRESH_TOKEN_EXPIRATION = 1000 * 60 * 60 * 24 * 7;
-
     public String generateToken(String username) {
-        return createToken(username, ACCESS_TOKEN_EXPIRATION);
-    }
-
-    public String generateRefreshToken(String username) {
-        return createToken(username, REFRESH_TOKEN_EXPIRATION);
-    }
-
-    private String createToken(String subject, long expirationTime) {
         return Jwts.builder()
-                .setSubject(subject)
+                .setSubject(username)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + expirationTime))
+                .setExpiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRATION))
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
